@@ -10,3 +10,6 @@ This will work for items added by mods, as long as those items have the same iss
 
 More about this issue is available at this thread:
 https://forums.beamdog.com/discussion/41397/do-the-new-item-icons-suck-in-baldurs-gate
+
+You can see the difference below:
+![comparison picture](comparison.png)
