@@ -2,6 +2,11 @@ BACKUP ~IconFix/backup~
 AUTHOR ~tunbridgep@gmail.com~
 VERSION ~1.0~
 
+////Load functions
+ALWAYS
+	INCLUDE ~%MOD_FOLDER%/lib/rewrite_file.txt~
+END
+
 README ~%MOD_FOLDER%/%LANGUAGE%/readme.txt~ ~%MOD_FOLDER%/readme.txt~
 
 LANGUAGE
@@ -9,28 +14,30 @@ LANGUAGE
 	~lang/english~
 	~%MOD_FOLDER%/lang/english/setup.tra~
 
+//Add IWD Icons, since they are mostly missing frames.
+//These are taken from BG:SOD mostly.
+BEGIN @1001
+REQUIRE_PREDICATE GAME_IS ~iwdee~ @1000
+COPY_EXISTING ~%MOD_FOLDER%/iwdicons~ ~override~
+IF_EXISTS
+
 //This makes a lot of assumptions, like that it's the first cycle we need to add to
 //It might need a clean up, but it should be good enough for now
-BEGIN @1001
-REQUIRE_PREDICATE GAME_IS ~bgee bg2ee iwdee~ @1001
+BEGIN @1002
+REQUIRE_PREDICATE GAME_IS ~bgee bg2ee iwdee~ @1000
 COPY_EXISTING_REGEXP GLOB ~^I.+\.bam$~ ~override~
-//COPY_EXISTING ~IWAND10.BAM~ ~override~
-	
-	//If it's a BAMC, decompress it
-	READ_ASCII 0x0 sig (4) //Signature
-	PATCH_IF (~%sig%~ STRING_EQUAL_CASE ~BAMC~ = 1) BEGIN
-		READ_LONG 0x8 datalength //Uncompressed data length
-		DECOMPRESS_REPLACE_FILE 0xc (SOURCE_SIZE - 0xc) datalength
-	END
-
-	READ_SHORT 0x08 frame_count
-	READ_BYTE 0x0a cycle_count
-	READ_LONG 0x0c frames
-	SET frame_size = 12
-	PATCH_IF frame_count == 2 && cycle_count == 2
-	BEGIN
-		//Modify first cycle
-		SET first_cycle_offset = frames + (frame_count * frame_size)
-		WRITE_SHORT first_cycle_offset + 0x00 2
-	END
+	LAUNCH_PATCH_FUNCTION fix_icons END
 BUT_ONLY
+COPY_EXISTING_REGEXP GLOB ~^#.+\.bam$~ ~override~
+	LAUNCH_PATCH_FUNCTION fix_icons END
+BUT_ONLY
+
+BEGIN @1003
+REQUIRE_PREDICATE GAME_IS ~bgee bg2ee iwdee~ @1000
+COPY_EXISTING ~ISW1H25.BAM~ ~override~
+//COPY_EXISTING_REGEXP GLOB ~^I.+\.bam$~ ~override~
+	LAUNCH_PATCH_FUNCTION resize_icons END
+BUT_ONLY
+//COPY_EXISTING_REGEXP GLOB ~^#.+\.bam$~ ~override~
+//	LAUNCH_PATCH_FUNCTION resize_icons END
+//BUT_ONLY

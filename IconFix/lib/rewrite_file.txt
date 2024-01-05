@@ -1,0 +1,61 @@
+DEFINE_PATCH_FUNCTION fix_icons BEGIN
+	LAUNCH_PATCH_FUNCTION decompress_file END
+
+	READ_SHORT 0x08 frame_count
+	READ_BYTE 0x0a cycle_count
+	READ_LONG 0x0c frames
+	SET frame_size = 12
+	PATCH_IF frame_count == 2 && cycle_count == 2
+	BEGIN
+		//Modify first cycle
+		SET first_cycle_offset = frames + (frame_count * frame_size)
+		WRITE_SHORT first_cycle_offset + 0x00 2
+	END
+	
+	//LAUNCH_PATCH_FUNCTION compress_file END
+END
+
+DEFINE_PATCH_FUNCTION resize_icons INT_VAR size = 3 BEGIN
+	
+	//First, we need to tell the file the first frame is larger
+	LAUNCH_PATCH_FUNCTION decompress_file END
+
+	READ_SHORT 0x08 frame_count
+	READ_BYTE 0x0a cycle_count
+	READ_LONG 0x0c frames
+	SET frame_size = 12
+	PATCH_IF frame_count == 2 && cycle_count == 2
+	BEGIN
+		//Get offset for frame 1
+		READ_SHORT 0x18 width
+		READ_SHORT 0x20 height
+		READ_SHORT 0x22 centerX
+		READ_SHORT 0x24 centerY
+		READ_SHORT 0x26 frame_data
+		PATCH_PRINT ~Frame 1: size: [%width%x%height%], center: [%centerX%,%centerY%]~
+	END
+	
+END
+
+DEFINE_PATCH_FUNCTION decompress_file BEGIN
+	//If it's a BAMC, decompress it
+	READ_ASCII 0x0 sig (6) //Signature
+	PATCH_IF (~%sig%~ STRING_EQUAL_CASE ~BAMCV1~ == 1) BEGIN
+		READ_LONG 0x8 datalength //Uncompressed data length
+		DECOMPRESS_REPLACE_FILE 0xc (SOURCE_SIZE - 0xc) datalength
+	END
+END
+
+//This doesn't work for some reason...
+//ERROR: Invalid_argument("Gz.compress")
+DEFINE_PATCH_FUNCTION compress_file BEGIN
+	//If it's a BAM, compress it
+	READ_ASCII 0x0 sig (6) //Signature
+	READ_LONG 0x8 dl //Uncompressed data length
+	PATCH_IF (~%sig%~ STRING_EQUAL_CASE ~BAM V1~ == 1) BEGIN
+		COMPRESS_REPLACE_FILE 0 dl 9
+		INSERT_BYTES 0x0 0xc
+		WRITE_ASCII 0x0 ~BAMCV1  ~
+		WRITE_LONG 0x8 dl
+	END
+END

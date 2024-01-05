@@ -1,3 +1,5 @@
 @1000	= ~This component is not available for your game.~
 
-@1001	= ~Classic Icon Fix~
+@1001	= ~Missing IWD:EE Icon Frames~
+@1002	= ~Classic Icon Fix~
+@1003	= ~Enlarge Selection Icons~
