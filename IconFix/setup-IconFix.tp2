@@ -23,21 +23,24 @@ IF_EXISTS
 
 //This makes a lot of assumptions, like that it's the first cycle we need to add to
 //It might need a clean up, but it should be good enough for now
-BEGIN @1002
+BEGIN @10021 //restore icons only
 REQUIRE_PREDICATE GAME_IS ~bgee bg2ee iwdee~ @1000
+SUBCOMPONENT @1002
 COPY_EXISTING_REGEXP GLOB ~^I.+\.bam$~ ~override~
+	LAUNCH_PATCH_FUNCTION decompress_file END
 	LAUNCH_PATCH_FUNCTION fix_icons END
 BUT_ONLY
 COPY_EXISTING_REGEXP GLOB ~^#.+\.bam$~ ~override~
+	LAUNCH_PATCH_FUNCTION decompress_file END
 	LAUNCH_PATCH_FUNCTION fix_icons END
 BUT_ONLY
 
-BEGIN @1003
+
+BEGIN @10022 //restore icons and resize
 REQUIRE_PREDICATE GAME_IS ~bgee bg2ee iwdee~ @1000
+SUBCOMPONENT @1002
 COPY_EXISTING ~ISW1H25.BAM~ ~override~
-//COPY_EXISTING_REGEXP GLOB ~^I.+\.bam$~ ~override~
+	LAUNCH_PATCH_FUNCTION decompress_file END
+	LAUNCH_PATCH_FUNCTION fix_icons END
 	LAUNCH_PATCH_FUNCTION resize_icons END
 BUT_ONLY
-//COPY_EXISTING_REGEXP GLOB ~^#.+\.bam$~ ~override~
-//	LAUNCH_PATCH_FUNCTION resize_icons END
-//BUT_ONLY

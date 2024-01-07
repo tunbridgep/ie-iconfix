@@ -1,6 +1,4 @@
 DEFINE_PATCH_FUNCTION fix_icons BEGIN
-	LAUNCH_PATCH_FUNCTION decompress_file END
-
 	READ_SHORT 0x08 frame_count
 	READ_BYTE 0x0a cycle_count
 	READ_LONG 0x0c frames
@@ -15,24 +13,101 @@ DEFINE_PATCH_FUNCTION fix_icons BEGIN
 	//LAUNCH_PATCH_FUNCTION compress_file END
 END
 
-DEFINE_PATCH_FUNCTION resize_icons INT_VAR size = 3 BEGIN
-	
-	//First, we need to tell the file the first frame is larger
-	LAUNCH_PATCH_FUNCTION decompress_file END
+DEFINE_PATCH_FUNCTION resize_icons INT_VAR resize_multiplier = 3 BEGIN
 
+
+	SET frame_entry_size = 12
+	SET cycle_entry_size = 4
 	READ_SHORT 0x08 frame_count
 	READ_BYTE 0x0a cycle_count
-	READ_LONG 0x0c frames
-	SET frame_size = 12
+	READ_LONG 0x0c frame_offset
+	READ_LONG 0x10 pallette
+	READ_LONG 0x14 frame_lookup_table
+	READ_SHORT 0x0b rle_index
+	PATCH_PRINT ~frame offset: %frame_offset%~
 	PATCH_IF frame_count == 2 && cycle_count == 2
 	BEGIN
-		//Get offset for frame 1
-		READ_SHORT 0x18 width
-		READ_SHORT 0x20 height
-		READ_SHORT 0x22 centerX
-		READ_SHORT 0x24 centerY
-		READ_SHORT 0x26 frame_data
-		PATCH_PRINT ~Frame 1: size: [%width%x%height%], center: [%centerX%,%centerY%]~
+		//First, we need to tell the file the first frame is larger
+
+		//Get frame data for frame 1
+		READ_SHORT (0x00 + frame_offset) width
+		READ_SHORT (0x02 + frame_offset) height
+		READ_SHORT (0x04 + frame_offset) centerX
+		READ_SHORT (0x06 + frame_offset) centerY
+		READ_LONG  (0x08 + frame_offset) frame_data
+		SET uncompressed = frame_data BAND 0b0000000000000001
+		SET frame_data = frame_data BAND 0b1111111111111110
+		PATCH_PRINT ~Frame 1: size: [%width%x%height%], center: [%centerX%,%centerY%], uncompressed: [%uncompressed%], frame_data: [%frame_data%], source size: [%SOURCE_SIZE%]~
+		
+		//Add new frame to our frames table
+		WRITE_BYTE 0x08 (frame_count + 1)
+		WRITE_BYTE 0x08 (frame_count + 1)
+		INSERT_BYTES (frame_offset + 24) frame_entry_size 
+		SET new_size = SOURCE_SIZE + frame_entry_size + 337 //???
+		WRITE_SHORT (0x00 + frame_offset + 24) width*resize_multiplier
+		WRITE_SHORT (0x02 + frame_offset + 24) height*resize_multiplier
+		WRITE_SHORT (0x04 + frame_offset + 24) centerX*resize_multiplier
+		WRITE_SHORT (0x06 + frame_offset + 24) centerY*resize_multiplier
+		WRITE_LONG (0x08 + frame_offset + 24) new_size
+		
+		//Update pallette and frame lookup table data to account for the new frame entry
+		WRITE_LONG 0x10 (pallette + frame_entry_size)
+		WRITE_LONG 0x14 (frame_lookup_table + frame_entry_size)
+		
+		//Update frame 1 frame data offset to account for the new frame entry
+		WRITE_LONG (0x08 + frame_offset) (frame_data + frame_entry_size)
+		
+		//Update frame 2 frame data offset to account for the new frame entry
+		READ_LONG (0x08 + frame_offset + frame_entry_size) frame_data_2
+		WRITE_LONG (0x08 + frame_offset + frame_entry_size) (frame_data_2 + frame_entry_size)
+		
+		PATCH_PRINT ~source size: [%SOURCE_SIZE%]~
+		
+		//Update the first cycle to point to frame 2->1, rather than 0->1
+		
+		//Write the new frame at end of file
+		PATCH_IF (!uncompressed) BEGIN
+			SET total = width*height*resize_multiplier
+			INSERT_BYTES (new_size) total*8
+			
+			READ_SHORT (0x08 + frame_offset) start_frame_data
+			
+			SET curpixel_orig = 0
+			SET curpixel_new = 0
+			SET finished = 0
+			SET do_once = 0
+			WHILE finished == 0 && curpixel_orig < width*height
+			BEGIN
+			
+				//Get original pixel data
+				SET original_pixel_position = start_frame_data + curpixel_orig
+				SET new_pixel_position = new_size + curpixel_new
+				READ_BYTE (original_pixel_position) original_pixel_data
+
+				SET counter = 0
+				PATCH_IF (original_pixel_data == 0) BEGIN
+					//handle transparent index position
+					
+					READ_SHORT (original_pixel_position) number
+					WHILE counter < resize_multiplier*2 BEGIN
+						WRITE_SHORT (new_pixel_position + counter) number
+						PATCH_PRINT ~writing new pixel data at %new_pixel_position%~
+						counter += 2
+					END
+					curpixel_new += resize_multiplier*2
+					curpixel_orig += 1
+				END ELSE BEGIN
+					//handle pixels as themselves
+					WHILE counter < resize_multiplier BEGIN
+						WRITE_BYTE (new_pixel_position + counter) original_pixel_data
+						counter += 1
+					END
+					curpixel_new += resize_multiplier
+				END
+				curpixel_orig += 1
+			END
+		END
+		
 	END
 	
 END
